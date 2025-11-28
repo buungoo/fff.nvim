@@ -90,6 +90,7 @@ fn test_search_memory_pattern(
                     1 + (i % 4),   // Vary thread count
                     None,
                     false, // prompt_position not relevant for test
+                    None,  // max_typos
                 );
                 (search_result.items.len(), search_result.total_matched)
             } else {
