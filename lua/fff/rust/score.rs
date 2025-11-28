@@ -33,7 +33,6 @@ pub fn match_and_score_files<'a>(
     };
 
     let query_contains_path_separator = context.query.contains(MAIN_SEPARATOR);
-    let query_lower = context.query.to_lowercase();
     let haystack: Vec<_> = files
         .iter()
         .map(|f| f.relative_path.to_lowercase())
@@ -43,7 +42,7 @@ pub fn match_and_score_files<'a>(
         context.query,
         haystack.len()
     );
-    let path_matches = neo_frizbee::match_list(&query_lower, &haystack, &options);
+    let path_matches = neo_frizbee::match_list(context.query, &haystack, &options);
     tracing::debug!(
         "Matched {} files for query '{}'",
         path_matches.len(),
@@ -67,7 +66,7 @@ pub fn match_and_score_files<'a>(
         vec![]
     } else {
         let mut list = neo_frizbee::match_list_parallel(
-            &query_lower,
+            context.query,
             &haystack_of_filenames,
             &options,
             context.max_threads,
