@@ -165,6 +165,9 @@ local function init()
       log_file = vim.fn.stdpath('log') .. '/fff.log',
       log_level = 'info',
     },
+    fuzzy = {
+      max_typos = nil, -- nil for auto (query.len / 4).clamp(2, 6), or set a fixed number
+    },
   }
 
   local migrated_user_config = handle_deprecated_config(config)

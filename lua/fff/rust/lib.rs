@@ -99,12 +99,13 @@ pub fn scan_files(_: &Lua, _: ()) -> LuaResult<()> {
 
 pub fn fuzzy_search_files(
     lua: &Lua,
-    (query, max_results, max_threads, current_file, order_reverse): (
+    (query, max_results, max_threads, current_file, order_reverse, max_typos): (
         String,
         usize,
         usize,
         Option<String>,
         bool,
+        Option<u16>,
     ),
 ) -> LuaResult<LuaValue> {
     let Some(ref mut picker) = *FILE_PICKER.write().map_err(|_| Error::AcquireItemLock)? else {
@@ -118,6 +119,7 @@ pub fn fuzzy_search_files(
         max_threads,
         current_file.as_deref(),
         order_reverse,
+        max_typos,
     );
 
     results.into_lua(lua)

@@ -163,6 +163,7 @@ impl FilePicker {
         max_threads: usize,
         current_file: Option<&'a str>,
         reverse_order: bool,
+        max_typos_override: Option<u16>,
     ) -> SearchResult<'a> {
         let max_threads = max_threads.max(1);
         debug!(
@@ -177,7 +178,7 @@ impl FilePicker {
         let (query, location) = parse_location(query);
 
         // small queries with a large number of results can match absolutely everything
-        let max_typos = (query.len() as u16 / 4).clamp(2, 6);
+        let max_typos = max_typos_override.unwrap_or_else(|| (query.len() as u16 / 4).clamp(2, 6));
         let context = ScoringContext {
             query,
             max_typos,

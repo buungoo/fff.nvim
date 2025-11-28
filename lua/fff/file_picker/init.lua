@@ -54,9 +54,10 @@ function M.search_files(query, max_results, max_threads, current_file, reverse_o
 
   max_results = max_results or config.max_results
   max_threads = max_threads or config.max_threads
+  local max_typos = config.fuzzy and config.fuzzy.max_typos or nil
 
   local ok, search_result =
-    pcall(fuzzy.fuzzy_search_files, query, max_results, max_threads, current_file, reverse_order)
+    pcall(fuzzy.fuzzy_search_files, query, max_results, max_threads, current_file, reverse_order, max_typos)
   if not ok then
     vim.notify('Failed to search files: ' .. tostring(search_result), vim.log.levels.ERROR)
     return {}
