@@ -1,7 +1,6 @@
 ---@class fff.grep_picker
 local M = {}
 
-local picker_ui = require('fff.picker_ui')
 local fuzzy = require('fff.fuzzy')
 local conf = require('fff.conf')
 
@@ -17,36 +16,49 @@ function M.open(initial_query)
     return
   end
 
-  -- Create a custom picker for grep
-  picker_ui.open_with_callback(initial_query or '', function(input, on_select)
-    if not input or input == '' then
-      return { items = {}, scores = {}, total_matched = 0, total_grepped = 0 }
-    end
+  -- Prompt user for search pattern
+  local pattern = initial_query or vim.fn.input('Grep pattern: ')
+  if not pattern or pattern == '' then
+    return
+  end
 
-    -- Perform fuzzy grep search
-    local result_ok, result = pcall(
-      fuzzy.fuzzy_grep_search,
-      input,           -- grep pattern
-      input,           -- fuzzy query (same as pattern for simplicity)
-      config.max_results or 100,
-      config.max_threads or 4
-    )
+  -- Perform fuzzy grep search
+  local result_ok, result = pcall(
+    fuzzy.fuzzy_grep_search,
+    pattern,         -- grep pattern (string)
+    pattern,         -- fuzzy query (string)
+    config.max_results or 100,
+    config.max_threads or 4
+  )
 
-    if not result_ok then
-      vim.notify('Grep search failed: ' .. tostring(result), vim.log.levels.ERROR)
-      return { items = {}, scores = {}, total_matched = 0, total_grepped = 0 }
-    end
+  if not result_ok then
+    vim.notify('Grep search failed: ' .. tostring(result), vim.log.levels.ERROR)
+    return
+  end
 
-    return result
-  end, {
-    title = 'Grep Search',
-    format_item = function(item)
-      return string.format('%s:%d: %s', item.relative_path, item.line_number, item.line_content)
-    end,
-    on_select = function(item)
+  if not result.items or #result.items == 0 then
+    vim.notify('No matches found for: ' .. pattern, vim.log.levels.INFO)
+    return
+  end
+
+  -- Display results using vim.ui.select
+  local formatted_items = {}
+  for i, item in ipairs(result.items) do
+    formatted_items[i] = string.format('%s:%d: %s',
+      item.relative_path,
+      item.line_number,
+      item.line_content:gsub('^%s+', ''))  -- Trim leading whitespace
+  end
+
+  vim.ui.select(formatted_items, {
+    prompt = string.format('Grep results (%d matches):', #result.items),
+    format_item = function(item) return item end,
+  }, function(choice, idx)
+    if choice and idx then
+      local item = result.items[idx]
       vim.cmd(string.format('edit +%d %s', item.line_number, vim.fn.fnameescape(item.path)))
-    end,
-  })
+    end
+  end)
 end
 
 return M
