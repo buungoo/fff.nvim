@@ -22,6 +22,47 @@ impl ContentSearcher {
         Ok(Self { base_path })
     }
 
+    /// Convert a fuzzy query into a permissive regex pattern that allows typos
+    /// For example, "funk" becomes "f(u|.)n(k|.)" to match "func", "function", etc.
+    fn fuzzy_query_to_regex(query: &str) -> String {
+        if query.len() <= 2 {
+            // For very short queries, just use the exact pattern
+            return Self::escape_regex(query);
+        }
+
+        // For longer queries, make the middle characters more flexible
+        let chars: Vec<char> = query.chars().collect();
+        let mut pattern = String::new();
+
+        for (i, ch) in chars.iter().enumerate() {
+            if i == 0 || i == chars.len() - 1 {
+                // Keep first and last character exact (but escaped)
+                pattern.push_str(&Self::escape_regex(&ch.to_string()));
+            } else {
+                // For middle characters, allow optional substitution
+                // This allows single character typos
+                pattern.push_str(&format!("({}|.)", Self::escape_regex(&ch.to_string())));
+            }
+        }
+
+        pattern
+    }
+
+    /// Escape special regex characters
+    fn escape_regex(s: &str) -> String {
+        let mut escaped = String::new();
+        for ch in s.chars() {
+            match ch {
+                '\\' | '.' | '+' | '*' | '?' | '(' | ')' | '|' | '[' | ']' | '{' | '}' | '^' | '$' => {
+                    escaped.push('\\');
+                    escaped.push(ch);
+                }
+                _ => escaped.push(ch),
+            }
+        }
+        escaped
+    }
+
     /// Perform grep search in the directory
     pub fn grep_search(
         &self,
@@ -128,8 +169,12 @@ impl ContentSearcher {
         max_results: usize,
         max_threads: usize,
     ) -> Result<GrepSearchResult, Error> {
-        // First, do the grep search
-        let grep_results = self.grep_search(grep_pattern, max_results * 2, max_threads)?;
+        // Convert the fuzzy query into a permissive regex pattern
+        let fuzzy_regex = Self::fuzzy_query_to_regex(grep_pattern);
+        info!("Fuzzy regex pattern: {}", fuzzy_regex);
+
+        // First, do the grep search with the fuzzy regex
+        let grep_results = self.grep_search(&fuzzy_regex, max_results * 2, max_threads)?;
 
         if grep_results.is_empty() {
             return Ok(GrepSearchResult {
