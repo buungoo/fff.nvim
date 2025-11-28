@@ -233,4 +233,49 @@ function M.open_file_under_cursor(open_cb)
   end)
 end
 
+--- Grep search with fuzzy filtering
+--- @param pattern string Grep pattern to search for
+--- @param fuzzy_query string Optional fuzzy query to filter grep results
+function M.grep(pattern, fuzzy_query)
+  if not pattern or pattern == '' then
+    vim.notify('Search pattern required', vim.log.levels.ERROR)
+    return
+  end
+
+  fuzzy_query = fuzzy_query or ''
+
+  local core = require('fff.core')
+  core.ensure_initialized()
+
+  -- Initialize content searcher if not already initialized
+  local config = require('fff.conf').get()
+  local ok, _ = pcall(require('fff.fuzzy').init_content_searcher, config.base_path)
+  if not ok then
+    vim.notify('Failed to initialize content searcher', vim.log.levels.ERROR)
+    return
+  end
+
+  local grep_ok, result = pcall(
+    require('fff.fuzzy').fuzzy_grep_search,
+    pattern,
+    fuzzy_query,
+    config.max_results or 100,
+    config.max_threads or 4
+  )
+
+  if not grep_ok then
+    vim.notify('Grep search failed: ' .. tostring(result), vim.log.levels.ERROR)
+    return
+  end
+
+  return result
+end
+
+--- Open grep picker UI
+--- @param initial_query string|nil Initial search query
+function M.grep_picker(initial_query)
+  local grep_picker = require('fff.grep_picker')
+  grep_picker.open(initial_query)
+end
+
 return M

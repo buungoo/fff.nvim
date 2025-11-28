@@ -33,4 +33,10 @@ M.cleanup_file_picker = rust_module.cleanup_file_picker
 M.init_tracing = rust_module.init_tracing
 M.wait_for_initial_scan = rust_module.wait_for_initial_scan
 
+-- Grep/content search functions
+M.init_content_searcher = rust_module.init_content_searcher
+M.fuzzy_grep_search = rust_module.fuzzy_grep_search
+M.grep_search = rust_module.grep_search
+M.cleanup_content_searcher = rust_module.cleanup_content_searcher
+
 return M

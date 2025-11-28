@@ -33,6 +33,8 @@ pub enum Error {
     DbCommit(#[source] heed::Error),
     #[error("Failed to start file system watcher: {0}")]
     FileSystemWatch(#[from] notify::Error),
+    #[error("Grep search error: {0}")]
+    GrepError(String),
 }
 
 impl From<Error> for mlua::Error {

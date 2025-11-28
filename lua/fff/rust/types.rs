@@ -17,6 +17,15 @@ pub struct FileItem {
 }
 
 #[derive(Debug, Clone)]
+pub struct GrepItem {
+    pub path: PathBuf,
+    pub relative_path: String,
+    pub line_number: usize,
+    pub line_content: String,
+    pub column: usize,
+}
+
+#[derive(Debug, Clone)]
 pub struct Score {
     pub total: i32,
     pub base_score: i32,
@@ -27,6 +36,22 @@ pub struct Score {
     pub current_file_penalty: i32,
     pub exact_match: bool,
     pub match_type: &'static str,
+}
+
+impl Default for Score {
+    fn default() -> Self {
+        Self {
+            total: 0,
+            base_score: 0,
+            filename_bonus: 0,
+            special_filename_bonus: 0,
+            frecency_boost: 0,
+            distance_penalty: 0,
+            current_file_penalty: 0,
+            exact_match: false,
+            match_type: "default",
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -46,6 +71,14 @@ pub struct SearchResult<'a> {
     pub total_matched: usize,
     pub total_files: usize,
     pub location: Option<Location>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GrepSearchResult {
+    pub items: Vec<GrepItem>,
+    pub scores: Vec<Score>,
+    pub total_matched: usize,
+    pub total_grepped: usize,
 }
 
 impl IntoLua for &FileItem {
@@ -122,6 +155,29 @@ impl IntoLua for SearchResult<'_> {
             table.set("location", location_table)?;
         }
 
+        Ok(LuaValue::Table(table))
+    }
+}
+
+impl IntoLua for GrepItem {
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
+        let table = lua.create_table()?;
+        table.set("path", self.path.to_string_lossy().to_string())?;
+        table.set("relative_path", self.relative_path)?;
+        table.set("line_number", self.line_number)?;
+        table.set("line_content", self.line_content)?;
+        table.set("column", self.column)?;
+        Ok(LuaValue::Table(table))
+    }
+}
+
+impl IntoLua for GrepSearchResult {
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
+        let table = lua.create_table()?;
+        table.set("items", self.items)?;
+        table.set("scores", self.scores)?;
+        table.set("total_matched", self.total_matched)?;
+        table.set("total_grepped", self.total_grepped)?;
         Ok(LuaValue::Table(table))
     }
 }

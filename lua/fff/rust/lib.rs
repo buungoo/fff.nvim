@@ -1,3 +1,4 @@
+use crate::content_searcher::ContentSearcher;
 use crate::error::Error;
 use crate::file_picker::FilePicker;
 use crate::frecency::FrecencyTracker;
@@ -8,10 +9,12 @@ use std::sync::RwLock;
 use std::time::Duration;
 
 mod background_watcher;
+mod content_searcher;
 mod error;
 pub mod file_picker;
 mod frecency;
 pub mod git;
+mod grep_score;
 mod location;
 mod path_utils;
 pub mod score;
@@ -24,6 +27,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 
 pub static FRECENCY: Lazy<RwLock<Option<FrecencyTracker>>> = Lazy::new(|| RwLock::new(None));
 pub static FILE_PICKER: Lazy<RwLock<Option<FilePicker>>> = Lazy::new(|| RwLock::new(None));
+pub static CONTENT_SEARCHER: Lazy<RwLock<Option<ContentSearcher>>> = Lazy::new(|| RwLock::new(None));
 
 pub fn init_db(_: &Lua, (db_path, use_unsafe_no_lock): (String, bool)) -> LuaResult<bool> {
     let mut frecency = FRECENCY.write().map_err(|_| Error::AcquireFrecencyLock)?;
@@ -234,6 +238,60 @@ pub fn init_tracing(
         .map_err(|e| LuaError::RuntimeError(format!("Failed to initialize tracing: {}", e)))
 }
 
+// ===== Grep/Content Search Functions =====
+
+pub fn init_content_searcher(_: &Lua, base_path: String) -> LuaResult<bool> {
+    let mut content_searcher = CONTENT_SEARCHER.write().map_err(|_| Error::AcquireItemLock)?;
+    if content_searcher.is_some() {
+        return Ok(false);
+    }
+
+    let path = PathBuf::from(&base_path);
+    let searcher = ContentSearcher::new(path)?;
+    *content_searcher = Some(searcher);
+    Ok(true)
+}
+
+pub fn fuzzy_grep_search(
+    lua: &Lua,
+    (grep_pattern, fuzzy_query, max_results, max_threads): (String, String, usize, usize),
+) -> LuaResult<LuaValue> {
+    let content_searcher = CONTENT_SEARCHER.read().map_err(|_| Error::AcquireItemLock)?;
+    let searcher = content_searcher
+        .as_ref()
+        .ok_or_else(|| LuaError::RuntimeError("Content searcher not initialized".to_string()))?;
+
+    let results = searcher.fuzzy_grep_search(&grep_pattern, &fuzzy_query, max_results, max_threads)?;
+    results.into_lua(lua)
+}
+
+pub fn grep_search(
+    lua: &Lua,
+    (pattern, max_results, max_threads): (String, usize, usize),
+) -> LuaResult<LuaValue> {
+    let content_searcher = CONTENT_SEARCHER.read().map_err(|_| Error::AcquireItemLock)?;
+    let searcher = content_searcher
+        .as_ref()
+        .ok_or_else(|| LuaError::RuntimeError("Content searcher not initialized".to_string()))?;
+
+    let results = searcher.grep_search(&pattern, max_results, max_threads)?;
+
+    let table = lua.create_table()?;
+    table.set("items", results)?;
+    Ok(LuaValue::Table(table))
+}
+
+pub fn cleanup_content_searcher(_: &Lua, _: ()) -> LuaResult<bool> {
+    let mut content_searcher = CONTENT_SEARCHER.write().map_err(|_| Error::AcquireItemLock)?;
+    if let Some(searcher) = content_searcher.take() {
+        drop(searcher);
+        ::tracing::info!("ContentSearcher cleanup completed");
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
 fn create_exports(lua: &Lua) -> LuaResult<LuaTable> {
     let exports = lua.create_table()?;
     exports.set("init_db", lua.create_function(init_db)?)?;
@@ -267,6 +325,19 @@ fn create_exports(lua: &Lua) -> LuaResult<LuaTable> {
     exports.set(
         "cleanup_file_picker",
         lua.create_function(cleanup_file_picker)?,
+    )?;
+    exports.set(
+        "init_content_searcher",
+        lua.create_function(init_content_searcher)?,
+    )?;
+    exports.set(
+        "fuzzy_grep_search",
+        lua.create_function(fuzzy_grep_search)?,
+    )?;
+    exports.set("grep_search", lua.create_function(grep_search)?)?;
+    exports.set(
+        "cleanup_content_searcher",
+        lua.create_function(cleanup_content_searcher)?,
     )?;
     Ok(exports)
 }
