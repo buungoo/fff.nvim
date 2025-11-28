@@ -22,7 +22,7 @@ pub fn match_and_score_files<'a>(
 
     let has_uppercase_letter = context.query.chars().any(|c| c.is_uppercase());
     let options = neo_frizbee::Config {
-        prefilter: true,
+        prefilter: false, // Disable prefilter to allow typos
         max_typos: Some(context.max_typos),
         sort: false,
         scoring: Scoring {
